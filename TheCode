@@ -1,0 +1,411 @@
+"""
+Ref: 
+Hatem.Yazidi@gmail.com 
+29/03/2025 
+"""
+import numpy as np
+from sklearn.datasets import make_blobs
+import matplotlib.pyplot as plt
+import pickle
+
+def sigmoid(z):
+    """
+    Sigmoid activation function
+    
+    Arguments:
+    z -- Input scalar or numpy array
+    
+    Returns:
+    s -- Sigmoid output
+    """
+    return 1 / (1 + np.exp(-z))
+
+def initialize_parameters(input_size):
+    """
+    Initialize parameters W and b
+    
+    Arguments:
+    input_size -- Size of the input feature vector
+    
+    Returns:
+    parameters -- Dictionary containing W and b
+    """
+    # Initialize weights and bias
+    W = np.random.randn(input_size, 1) * 0.01  # Small random values
+    b = 0
+    
+    parameters = {"W": W, "b": b}
+    return parameters
+
+def forward_propagation(X, parameters):
+    """
+    Forward propagation
+    
+    Arguments:
+    X -- Input data (matrix of size m x input_size, where m is number of examples)
+    parameters -- Dictionary containing W and b
+    
+    Returns:
+    A -- Activation output
+    cache -- Dictionary containing Z (for backpropagation)
+    """
+    W = parameters["W"]
+    b = parameters["b"]
+    
+    # Forward step
+    Z = np.dot(X, W) + b  # Z = X.W + b
+    A = sigmoid(Z)  # A = 1/(1+e^(-Z))
+    
+    cache = {"Z": Z}
+    return A, cache
+
+def compute_cost(A, Y):
+    """
+    Compute the binary cross-entropy cost function
+    
+    Arguments:
+    A -- Activation output (predictions)
+    Y -- True labels
+    
+    Returns:
+    cost -- Binary cross-entropy cost
+    """
+    m = Y.shape[0]  # Number of examples
+    
+    # Binary cross-entropy: L = (-1/m) sum(y*log(A) + (1-y)*log(1-A))
+    # Adding small epsilon to avoid log(0)
+    epsilon = 1e-8
+    cost = (-1/m) * np.sum(Y * np.log(A + epsilon) + (1 - Y) * np.log(1 - A + epsilon))
+    
+    return cost
+
+def backward_propagation(X, Y, A):
+    """
+    Backward propagation to compute gradients
+    
+    Arguments:
+    X -- Input data (matrix of size m x input_size)
+    Y -- True labels
+    A -- Activation output (predictions)
+    
+    Returns:
+    grads -- Dictionary containing gradients of cost with respect to W and b
+    """
+    m = Y.shape[0]  # Number of examples
+    
+    # Compute gradients
+    dW = (1/m) * np.dot(X.T, (A - Y))  # dL/dW = 1/m * (X^T . (A-Y))
+    db = (1/m) * np.sum(A - Y)         # dL/db = 1/m * sum(A-Y)
+    
+    grads = {"dW": dW, "db": db}
+    return grads
+
+def update_parameters(parameters, grads, learning_rate):
+    """
+    Update parameters using gradient descent
+    
+    Arguments:
+    parameters -- Dictionary containing W and b
+    grads -- Dictionary containing gradients dW and db
+    learning_rate -- Learning rate (alpha)
+    
+    Returns:
+    parameters -- Updated parameters
+    """
+    W = parameters["W"]
+    b = parameters["b"]
+    
+    dW = grads["dW"]
+    db = grads["db"]
+    
+    # Update parameters
+    W = W - learning_rate * dW  # W = W - alpha * dL/dW
+    b = b - learning_rate * db  # b = b - alpha * dL/db
+    
+    parameters = {"W": W, "b": b}
+    return parameters
+
+def model(X, Y, num_iterations=1000, learning_rate=0.1, print_cost=False):
+    """
+    Train a logistic regression model
+    
+    Arguments:
+    X -- Input data
+    Y -- True labels
+    num_iterations -- Number of iterations for gradient descent
+    learning_rate -- Learning rate (alpha)
+    print_cost -- Print cost every 100 iterations
+    
+    Returns:
+    parameters -- Learned parameters
+    costs -- Array of costs
+    """
+    input_size = X.shape[1]  # Number of features
+    
+    # Initialize parameters
+    parameters = initialize_parameters(input_size)
+    costs = []
+    
+    # Gradient descent
+    for i in range(num_iterations):
+        # Forward propagation
+        A, cache = forward_propagation(X, parameters)
+        
+        # Compute cost
+        cost = compute_cost(A, Y)
+        
+        # Backward propagation
+        grads = backward_propagation(X, Y, A)
+        
+        # Update parameters
+        parameters = update_parameters(parameters, grads, learning_rate)
+        
+        # Print cost
+        if print_cost and i % 100 == 0:
+            print(f"Cost after iteration {i}: {cost}")
+            costs.append(cost)
+    
+    return parameters, costs
+
+def predict(X, parameters):
+    """
+    Make predictions using learned parameters
+    
+    Arguments:
+    X -- Input data
+    parameters -- Dictionary containing W and b
+    
+    Returns:
+    predictions -- Binary predictions
+    """
+    # Forward propagation
+    A, _ = forward_propagation(X, parameters)
+    
+    # Convert probabilities to binary predictions
+    predictions = (A > 0.5).astype(int)
+    
+    return predictions, A
+
+def plot_decision_boundary(X, Y, parameters, title="Decision Boundary"):
+    """
+    Plot the decision boundary
+    
+    Arguments:
+    X -- Input data
+    Y -- True labels
+    parameters -- Dictionary containing W and b
+    title -- Title for the plot
+    """
+    # Set min and max values for the grid
+    x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
+    y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
+    
+    # Create a mesh grid
+    h = 0.01
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
+    
+    # Flatten the grid points
+    grid_points = np.c_[xx.ravel(), yy.ravel()]
+    
+    # Make predictions on the grid points
+    Z, _ = forward_propagation(grid_points, parameters)
+    Z = Z.reshape(xx.shape)
+    
+    # Plot the contour and training examples
+    plt.figure(figsize=(10, 8))
+    plt.contourf(xx, yy, Z, alpha=0.3)
+    plt.scatter(X[:, 0], X[:, 1], c=Y.ravel(), edgecolors='k', marker='o', s=80)
+    plt.xlabel('Feature 1')
+    plt.ylabel('Feature 2')
+    plt.title(title)
+    plt.colorbar()
+    plt.show()
+
+def save_parameters(parameters, filename="model_parameters.pkl"):
+    """
+    Save model parameters to a file
+    
+    Arguments:
+    parameters -- Dictionary containing W and b
+    filename -- File name to save the parameters
+    """
+    with open(filename, 'wb') as f:
+        pickle.dump(parameters, f)
+    print(f"Parameters saved to {filename}")
+
+def load_parameters(filename="model_parameters.pkl"):
+    """
+    Load model parameters from a file
+    
+    Arguments:
+    filename -- File name to load the parameters from
+    
+    Returns:
+    parameters -- Dictionary containing W and b
+    """
+    with open(filename, 'rb') as f:
+        parameters = pickle.load(f)
+    print(f"Parameters loaded from {filename}")
+    return parameters
+
+def predict_user_input(user_input, parameters, plot_data=True, X_train=None, Y_train=None):
+    """
+    Make prediction on user-provided data point(s)
+    
+    Arguments:
+    user_input -- User input data point(s) as numpy array [n_samples, n_features]
+    parameters -- Dictionary containing W and b
+    plot_data -- Boolean to indicate whether to plot the result
+    X_train -- Training data for visualization context (optional)
+    Y_train -- Training labels for visualization context (optional)
+    
+    Returns:
+    prediction -- Binary prediction
+    probability -- Probability of class 1
+    """
+    # Ensure user_input is a numpy array with proper shape
+    if isinstance(user_input, list):
+        user_input = np.array(user_input)
+    
+    # Reshape if single example is provided as a 1D array
+    if len(user_input.shape) == 1:
+        user_input = user_input.reshape(1, -1)
+    
+    # Forward propagation
+    probability, _ = forward_propagation(user_input, parameters)
+    prediction = (probability > 0.5).astype(int)
+    
+    # Print results
+    print("\nPrediction Results for User Input:")
+    print("-" * 60)
+    for i in range(user_input.shape[0]):
+        print(f"Example {i+1}:")
+        print(f"  Input features: {user_input[i]}")
+        print(f"  Probability of class 1: {probability[i][0]:.4f} ({probability[i][0]*100:.2f}%)")
+        print(f"  Probability of class 0: {1-probability[i][0]:.4f} ({(1-probability[i][0])*100:.2f}%)")
+        print(f"  Predicted class: {prediction[i][0]}")
+        print("-" * 60)
+    
+    # Plot the result if requested and we have 2D data
+    if plot_data and user_input.shape[1] == 2:
+        # Create plot
+        plt.figure(figsize=(10, 8))
+        
+        # If training data is provided, plot it for context
+        if X_train is not None and Y_train is not None:
+            plt.scatter(X_train[:, 0], X_train[:, 1], c=Y_train.ravel(), 
+                      alpha=0.5, edgecolors='k', marker='o', s=50)
+        
+        # Plot decision boundary if we have enough context
+        if X_train is not None:
+            # Set min and max values for the grid
+            x_min, x_max = min(X_train[:, 0].min(), user_input[:, 0].min()) - 1, max(X_train[:, 0].max(), user_input[:, 0].max()) + 1
+            y_min, y_max = min(X_train[:, 1].min(), user_input[:, 1].min()) - 1, max(X_train[:, 1].max(), user_input[:, 1].max()) + 1
+            
+            # Create a mesh grid
+            h = 0.01
+            xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
+            
+            # Flatten the grid points
+            grid_points = np.c_[xx.ravel(), yy.ravel()]
+            
+            # Make predictions on the grid points
+            Z, _ = forward_propagation(grid_points, parameters)
+            Z = Z.reshape(xx.shape)
+            
+            # Plot contour
+            plt.contourf(xx, yy, Z, alpha=0.3)
+        
+        # Plot user input points with special marker
+        for i in range(user_input.shape[0]):
+            marker_color = 'green' if prediction[i][0] == 1 else 'red'
+            plt.scatter(user_input[i, 0], user_input[i, 1], 
+                      c=marker_color, edgecolors='black', marker='*', s=200)
+            # Add text label with probability
+            plt.annotate(f"{probability[i][0]:.4f}", 
+                       (user_input[i, 0], user_input[i, 1]),
+                       textcoords="offset points", 
+                       xytext=(0,10), 
+                       ha='center')
+        
+        plt.xlabel('Feature 1')
+        plt.ylabel('Feature 2')
+        plt.title('User Input Prediction')
+        plt.colorbar()
+        plt.show()
+    
+    return prediction, probability
+
+# Part 1: Train the model and save parameters
+# Generate training data using make_blobs
+np.random.seed(42)  # For reproducibility
+X_train, Y_train_temp = make_blobs(n_samples=100, n_features=2, centers=2, cluster_std=2, random_state=0)
+Y_train = Y_train_temp.reshape(-1, 1)  # Reshape Y to be a column vector
+
+# Plot training data
+plt.figure(figsize=(8, 6))
+plt.scatter(X_train[:, 0], X_train[:, 1], c=Y_train.ravel(), edgecolors='k', marker='o', s=80)
+plt.xlabel('Feature 1')
+plt.ylabel('Feature 2')
+plt.title('Training Data using make_blobs')
+plt.colorbar()
+plt.show()
+
+# Train model
+parameters, costs = model(X_train, Y_train, num_iterations=2000, learning_rate=0.3, print_cost=True)
+
+# Plot cost over iterations
+plt.figure(figsize=(8, 6))
+plt.plot(range(0, 2000, 100), costs)
+plt.xlabel('Iterations')
+plt.ylabel('Cost')
+plt.title('Cost over Iterations')
+plt.show()
+
+# Save the parameters
+save_parameters(parameters)
+
+# Plot decision boundary
+plot_decision_boundary(X_train, Y_train, parameters, title="Training Data Decision Boundary")
+
+# Part 2: Make predictions with user input
+# Example of user input data - you can replace these with your own values
+# Creating several examples for different scenarios
+user_data_examples = [
+    [3.0, 2.0],        # Example 1
+    [0.0, 0.0],        # Example 2
+    [-2.0, -2.0],      # Example 3
+    [-3.0, 1.0]        # Example 4
+]
+
+# Convert list to numpy array
+user_data = np.array(user_data_examples)
+
+# Make predictions on user data
+predictions, probabilities = predict_user_input(user_data, parameters, 
+                                             plot_data=True, 
+                                             X_train=X_train, 
+                                             Y_train=Y_train)
+
+# Sample code for interactive user input (commented out for convenience)
+"""
+# Interactive user input example (uncomment to use)
+def get_user_input():
+    try:
+        print("\nEnter your feature values (for 2 features):")
+        feature1 = float(input("Feature 1: "))
+        feature2 = float(input("Feature 2: "))
+        return np.array([[feature1, feature2]])
+    except ValueError:
+        print("Invalid input. Please enter numerical values.")
+        return get_user_input()
+
+# Loop for interactive prediction
+while True:
+    user_data = get_user_input()
+    predict_user_input(user_data, parameters, True, X_train, Y_train)
+    
+    continue_flag = input("\nMake another prediction? (y/n): ")
+    if continue_flag.lower() != 'y':
+        break
+"""
